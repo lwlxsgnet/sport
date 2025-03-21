@@ -49,7 +49,7 @@
                 </template>
                 <template #op="slotProps">
                     <t-space>
-                        <t-link theme="primary" @click="handleClickDetail()"> {{ t('pages.listBase.detail') }}</t-link>
+                        <t-link theme="primary" @click="handleClickDetail(slotProps)"> 修改 </t-link>
                         <t-link theme="danger" @click="handleClickDelete(slotProps)"> {{ t('pages.listBase.delete')
                             }}</t-link>
                     </t-space>
@@ -58,13 +58,13 @@
             <t-dialog v-model:visible="confirmVisible" header="确认删除当前所选用户？" :body="confirmBody" :on-cancel="onCancel"
                 @confirm="onConfirmDelete" />
 
-            <t-dialog header="请填写用户信息" v-model:visible="modelOpen" >
+            <t-dialog header="请填写用户信息" v-model:visible="modelOpen" @confirm="onModelSubmit">
                 <!-- ref 不能和data定义名称一样 -->
-                <t-form ref="submitFormRef" :data="submitForm" colon @submit="onModelSubmit" :rules="FORM_RULES">
+                <t-form ref="submitFormRef" :data="submitForm" colon :rules="FORM_RULES">
                     <t-form-item label="用户名" name="username">
                         <t-input v-model="submitForm.username" type="search" placeholder="请输入用户名" />
                     </t-form-item>
-                    <t-form-item label="密码" name="password">
+                    <t-form-item label="密码" name="password" v-if="!submitForm.id">
                         <t-input type="password" v-model="submitForm.password" placeholder="请输入密码" >
                             <template #prefix-icon>
                                 <lock-on-icon />
@@ -77,6 +77,9 @@
                             <t-option label="女" :value="1" />
                             <t-option label="未知" :value="2" />
                         </t-select>
+                    </t-form-item>
+                    <t-form-item label="昵称" name="nickname">
+                        <t-input v-model="submitForm.nickname" placeholder="请输入昵称" />
                     </t-form-item>
                     <t-form-item label="电话" name="phone">
                         <t-input-number theme="normal" v-model="submitForm.phone" placeholder="请输入电话" 
@@ -96,15 +99,10 @@
 import { MessagePlugin, PageInfo, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
 import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
-
-import { getList } from '@/api/list';
-import Trend from '@/components/trend/index.vue';
 import { prefix } from '@/config/global';
-import { CONTRACT_PAYMENT_TYPES, CONTRACT_STATUS, CONTRACT_TYPES } from '@/constants';
 import { t } from '@/locales';
 import { useSettingStore } from '@/store';
-import { page } from '@/api/sysUser'
-import { reactive } from 'vue';
+import { page, update, insert as insertApi, deleteById } from '@/api/sysUser'
 import type { FormInstanceFunctions, FormRule, SubmitContext } from 'tdesign-vue-next';
 
 
@@ -116,19 +114,6 @@ interface FormData {
 const store = useSettingStore();
 const router = useRouter();
 
-const CONTRACT_STATUS_OPTIONS = [
-    { value: CONTRACT_STATUS.FAIL, label: t('components.commonTable.contractStatusEnum.fail') },
-    { value: CONTRACT_STATUS.AUDIT_PENDING, label: t('components.commonTable.contractStatusEnum.audit') },
-    { value: CONTRACT_STATUS.EXEC_PENDING, label: t('components.commonTable.contractStatusEnum.pending') },
-    { value: CONTRACT_STATUS.EXECUTING, label: t('components.commonTable.contractStatusEnum.executing') },
-    { value: CONTRACT_STATUS.FINISH, label: t('components.commonTable.contractStatusEnum.finish') },
-];
-
-const CONTRACT_TYPE_OPTIONS = [
-    { value: CONTRACT_TYPES.MAIN, label: t('components.commonTable.contractTypeEnum.main') },
-    { value: CONTRACT_TYPES.SUB, label: t('components.commonTable.contractTypeEnum.sub') },
-    { value: CONTRACT_TYPES.SUPPLEMENT, label: t('components.commonTable.contractTypeEnum.supplement') },
-];
 const COLUMNS: PrimaryTableCol[] = [
     {
         title: '用户名',
@@ -198,13 +183,16 @@ const INITIAL_DATA = {
   password: '',
   sex: 2,
   email: '',
+  nickname: '',
 };
 const submitForm = ref(INITIAL_DATA);
+const submitFormRef = ref<FormInstanceFunctions>(null);
 
+// 属性校验
 const FORM_RULES: Record<string, FormRule[]> = {
-  phone: [{ required: true, message: t('pages.login.required.phone'), type: 'error' }],
-  username: [{ required: true, message: t('pages.login.required.account'), type: 'error' }],
-  password: [{ required: true, message: t('pages.login.required.password'), type: 'error' }],
+  phone: [{ required: true, message: t('pages.login.required.phone'), type: 'error', trigger: 'blur'}],
+  username: [{ required: true, message: t('pages.login.required.account'), type: 'error', trigger: 'blur' }],
+  password: [{ required: true, message: t('pages.login.required.password'), type: 'error', trigger: 'blur' }],
   email: [{ email: true, message: "邮箱地址不正确" }],
 };
 
@@ -233,26 +221,29 @@ const findData = async (pageNo: number, pageSize: number) => {
     }
 };
 
-const deleteIdx = ref(-1);
+const deleteIdx = ref<string>('');
 const confirmBody = computed(() => {
-    if (deleteIdx.value > -1) {
-        const { name } = data.value[deleteIdx.value];
-        return `删除后，${name}的所有合同信息将被清空，且无法恢复`;
+    if (deleteIdx.value != '') {
+        return `删除后，标记为${deleteIdx.value}的用户信息将被清空，且无法恢复`;
     }
     return '';
 });
 
+//reset
 const resetIdx = () => {
-    deleteIdx.value = -1;
+    deleteIdx.value = '';
 };
 
-const onConfirmDelete = () => {
+const onConfirmDelete = async () => {
     // 真实业务请发起请求
-    data.value.splice(deleteIdx.value, 1);
-    pagination.value.total = data.value.length;
-    confirmVisible.value = false;
-    MessagePlugin.success('删除成功');
-    resetIdx();
+    if (deleteIdx.value && deleteIdx.value != '') {
+        await deleteById(deleteIdx.value);
+        modelOpen.value = false;
+        pagination.value.total = data.value.length;
+        MessagePlugin.success('删除成功');
+        resetIdx();
+        findData(pagination.value.defaultCurrent, pagination.value.defaultPageSize);
+    }
 };
 
 const onCancel = () => {
@@ -266,16 +257,18 @@ onMounted(() => {
     findData(pagination.value.defaultCurrent, pagination.value.defaultPageSize);
 });
 
-const handleClickDelete = (slot: { row: { rowIndex: number } }) => {
-    deleteIdx.value = slot.row.rowIndex;
+const handleClickDelete = (slot: { row: any }) => {
+    deleteIdx.value = slot.row.id;
     confirmVisible.value = true;
 };
 const onReset = (val: unknown) => {
     console.log(val);
 };
 
-const handleClickDetail = () => {
-    router.push('/detail/base');
+const handleClickDetail = (slot: { row: any }) => {
+    submitForm.value = slot.row;
+    modelOpen.value = true;
+    
 };
 
 //查询按钮点击
@@ -294,19 +287,38 @@ const pageChange = ({ current, pageSize }: PageInfo) => {
 //     console.log('统一Change', changeParams, triggerAndData);
 // };
 
-const onModelSubmit = (cxt: SubmitContext) => {
-    if(cxt.validateResult) {  }
+/**
+ * 提交表单
+ * @param cxt 
+ */
+const onModelSubmit = async () => {
+    const valid = await submitFormRef.value.validate();
+    if (valid) {
+        if (submitForm.value.id) {
+            //更新
+            await update(submitForm.value);
+        } else {
+            //新增
+            await insertApi(submitForm.value);
+        }
+        MessagePlugin.success('操作成功');
+        modelOpen.value = false;
+        //刷新数据
+        findData(pagination.value.defaultCurrent, pagination.value.defaultPageSize);
+    }
 }
 
 const insert = () => {
     //打开dialog
     modelOpen.value = true;
+    //重置表单
     submitForm.value = {
         username: '',
         password: '',
         sex: 2,
         phone: '',
         email: '',
+        nickname: '',
     }
 }
 
