@@ -11,4 +11,4 @@ insert_final_newline = true
 trim_trailing_whitespace = false
 
 [*.{ts,js,vue,css}]
-indent_size = 2
+indent_size = 4

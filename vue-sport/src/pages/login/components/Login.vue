@@ -1,15 +1,9 @@
 <template>
-  <t-form
-    ref="form"
-    :class="['item-container', `login-${type}`]"
-    :data="formData"
-    :rules="FORM_RULES"
-    label-width="0"
-    @submit="onSubmit"
-  >
+  <t-form ref="form" :class="['item-container', `login-${type}`]" :data="formData" :rules="FORM_RULES" label-width="0"
+    @submit="onSubmit">
     <template v-if="type == 'password'">
       <t-form-item name="account">
-        <t-input v-model="formData.account" size="large" :placeholder="`${t('pages.login.input.account')}：admin`">
+        <t-input v-model="formData.username" size="large" :placeholder="`${t('pages.login.input.account')}`">
           <template #prefix-icon>
             <t-icon name="user" />
           </template>
@@ -17,13 +11,8 @@
       </t-form-item>
 
       <t-form-item name="password">
-        <t-input
-          v-model="formData.password"
-          size="large"
-          :type="showPsw ? 'text' : 'password'"
-          clearable
-          :placeholder="`${t('pages.login.input.password')}：admin`"
-        >
+        <t-input v-model="formData.password" size="large" :type="showPsw ? 'text' : 'password'" clearable
+          :placeholder="`${t('pages.login.input.password')}`">
           <template #prefix-icon>
             <t-icon name="lock-on" />
           </template>
@@ -49,7 +38,7 @@
     </template>
 
     <!-- 手机号登录 -->
-    <template v-else>
+    <!-- <template v-else>
       <t-form-item name="phone">
         <t-input v-model="formData.phone" size="large" :placeholder="t('pages.login.input.phone')">
           <template #prefix-icon>
@@ -64,7 +53,7 @@
           {{ countDown == 0 ? t('pages.login.sendVerification') : `${countDown}秒后可重发` }}
         </t-button>
       </t-form-item>
-    </template>
+    </template> -->
 
     <t-form-item v-if="type !== 'qrcode'" class="btn-container">
       <t-button block size="large" type="submit"> {{ t('pages.login.signIn') }} </t-button>
@@ -73,9 +62,9 @@
     <div class="switch-container">
       <span v-if="type !== 'password'" class="tip" @click="switchType('password')">{{
         t('pages.login.accountLogin')
-      }}</span>
+        }}</span>
       <span v-if="type !== 'qrcode'" class="tip" @click="switchType('qrcode')">{{ t('pages.login.wechatLogin') }}</span>
-      <span v-if="type !== 'phone'" class="tip" @click="switchType('phone')">{{ t('pages.login.phoneLogin') }}</span>
+      <!-- <span v-if="type !== 'phone'" class="tip" @click="switchType('phone')">{{ t('pages.login.phoneLogin') }}</span> -->
     </div>
   </t-form>
 </template>
@@ -86,9 +75,6 @@ import type { FormInstanceFunctions, FormRule, SubmitContext } from 'tdesign-vue
 import { MessagePlugin } from 'tdesign-vue-next';
 import { ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-
-import { test } from '@/api/test'
-
 import { useCounter } from '@/hooks';
 import { t } from '@/locales';
 import { useUserStore } from '@/store';
@@ -97,15 +83,15 @@ const userStore = useUserStore();
 
 const INITIAL_DATA = {
   phone: '',
-  account: 'admin',
-  password: 'admin',
+  username: '',
+  password: '',
   verifyCode: '',
   checked: false,
 };
 
 const FORM_RULES: Record<string, FormRule[]> = {
   phone: [{ required: true, message: t('pages.login.required.phone'), type: 'error' }],
-  account: [{ required: true, message: t('pages.login.required.account'), type: 'error' }],
+  username: [{ required: true, message: t('pages.login.required.account'), type: 'error' }],
   password: [{ required: true, message: t('pages.login.required.password'), type: 'error' }],
   verifyCode: [{ required: true, message: t('pages.login.required.verification'), type: 'error' }],
 };
@@ -137,21 +123,18 @@ const sendCode = () => {
 };
 
 const onSubmit = async (ctx: SubmitContext) => {
-  const res = await test();
-  console.log("request result:", res)
-  // if (ctx.validateResult === true) {
-  //   try {
-  //     await userStore.login(formData.value);
-
-  //     MessagePlugin.success('登录成功');
-  //     const redirect = route.query.redirect as string;
-  //     const redirectUrl = redirect ? decodeURIComponent(redirect) : '/dashboard';
-  //     router.push(redirectUrl);
-  //   } catch (e) {
-  //     console.log(e);
-  //     MessagePlugin.error(e.message);
-  //   }
-  // }
+  if (ctx.validateResult === true) {
+    try {
+      await userStore.login(formData.value);
+      MessagePlugin.success('登录成功');
+      const redirect = route.query.redirect as string;
+      const redirectUrl = redirect ? decodeURIComponent(redirect) : '/dashboard';
+      router.push(redirectUrl);
+    } catch (e) {
+      console.log(e);
+      MessagePlugin.error(e.message);
+    }
+  }
 };
 </script>
 

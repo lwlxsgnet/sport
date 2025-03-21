@@ -19,7 +19,7 @@ import jakarta.annotation.Resource;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/sysUser")
+@RequestMapping("/user")
 @Tag(name = "用户管理")
 @ApiSupport(author = "leo lau: lwlxsg@163.com", order = 1)
 public class SysUserController {
@@ -43,7 +43,7 @@ public class SysUserController {
     public Result<Page<SysUser>> pageQuery(@RequestBody PageParams<SysUser> pageParams){
         SysUser params = pageParams.getParams();
         LambdaQueryWrapper<SysUser> queryWrapper = new LambdaQueryWrapper<>();
-        queryWrapper.eq(StrUtil.isNotBlank(params.getNickname()), SysUser::getNickname, params.getNickname());
+        queryWrapper.like(StrUtil.isNotBlank(params.getNickname()), SysUser::getNickname, params.getNickname());
         return Result.success(sysUserService.page(pageParams.getPage(), queryWrapper));
     }
 
