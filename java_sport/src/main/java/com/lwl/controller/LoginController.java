@@ -41,6 +41,7 @@ public class LoginController {
             SaTokenInfo token = StpUtil.getTokenInfo();
             map.put("tokenHead", token.tokenName);
             map.put("token", token.tokenValue);
+            map.put("timeout", String.valueOf(token.tokenTimeout));
             return Result.success(map);
         }
         return Result.error("账号或者密码错误");

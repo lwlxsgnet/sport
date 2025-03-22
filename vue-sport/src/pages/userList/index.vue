@@ -118,46 +118,44 @@ const COLUMNS: PrimaryTableCol[] = [
     {
         title: '用户名',
         fixed: 'left',
-        width: 280,
         ellipsis: true,
-        align: 'left',
+        align: 'center',
         colKey: 'username',
     },
     {
         title: '头像',
-        width: 160,
         ellipsis: true,
         colKey: 'avatar',
+        align: 'center',
     },
     {
         title: '性别',
         colKey: 'sex',
-        width: 160
+        align: 'center',
     },
     {
         title: t('pages.userList.nickname'),
-        width: 160,
         ellipsis: true,
         colKey: 'nickname',
+        align: 'center',
     },
     {
         title: '电话',
-        width: 160,
         ellipsis: true,
         colKey: 'phone',
+        align: 'center',
     },
     {
         title: '邮件',
-        width: 160,
         ellipsis: true,
         colKey: 'email',
+        align: 'center',
     },
     {
-        align: 'left',
         fixed: 'right',
-        width: 160,
         colKey: 'op',
         title: t('components.commonTable.operation'),
+        align: 'center',
     },
 ];
 

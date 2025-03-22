@@ -1,283 +1,136 @@
 <template>
   <div>
-    <t-card class="list-card-container" :bordered="false">
-      <t-row justify="space-between">
-        <div class="left-operation-container">
-          <t-button @click="handleSetupContract"> {{ t('pages.listBase.create') }} </t-button>
-          <t-button variant="base" theme="default" :disabled="!selectedRowKeys.length">
-            {{ t('pages.listBase.export') }}</t-button
-          >
-          <p v-if="!!selectedRowKeys.length" class="selected-count">
-            {{ t('pages.listBase.select') }} {{ selectedRowKeys.length }} {{ t('pages.listBase.items') }}
-          </p>
-        </div>
-        <div class="search-input">
-          <t-input v-model="searchValue" :placeholder="t('pages.listBase.placeholder')" clearable>
-            <template #suffix-icon>
-              <search-icon size="16px" />
+    <s-table :search-params="searchParams" :columns="columns" :async-fn="page" ref="table">
+      <template #tableHeader>
+        <t-button @click="insert">新增用户</t-button>
+      </template>
+    </s-table>
+    <t-dialog header="请填写用户信息" v-model:visible="modelOpen" @confirm="onModelSubmit">
+      <!-- ref 不能和data定义名称一样 -->
+      <t-form ref="submitFormRef" :data="submitForm" colon :rules="FORM_RULES">
+        <t-form-item label="用户名" name="username">
+          <t-input v-model="submitForm.username" type="search" placeholder="请输入用户名" />
+        </t-form-item>
+        <t-form-item label="密码" name="password" v-if="!submitForm.id">
+          <t-input type="password" v-model="submitForm.password" placeholder="请输入密码">
+            <template #prefix-icon>
+              <lock-on-icon />
             </template>
           </t-input>
-        </div>
-      </t-row>
-      <t-table
-        :data="data"
-        :columns="COLUMNS"
-        :row-key="rowKey"
-        vertical-align="top"
-        :hover="true"
-        :pagination="pagination"
-        :selected-row-keys="selectedRowKeys"
-        :loading="dataLoading"
-        :header-affixed-top="headerAffixedTop"
-        @page-change="rehandlePageChange"
-        @change="rehandleChange"
-        @select-change="(value: number[]) => rehandleSelectChange(value)"
-      >
-        <template #status="{ row }">
-          <t-tag v-if="row.status === CONTRACT_STATUS.FAIL" theme="danger" variant="light">
-            {{ t('pages.listBase.contractStatusEnum.fail') }}</t-tag
-          >
-          <t-tag v-if="row.status === CONTRACT_STATUS.AUDIT_PENDING" theme="warning" variant="light">
-            {{ t('pages.listBase.contractStatusEnum.audit') }}
-          </t-tag>
-          <t-tag v-if="row.status === CONTRACT_STATUS.EXEC_PENDING" theme="warning" variant="light">
-            {{ t('pages.listBase.contractStatusEnum.pending') }}
-          </t-tag>
-          <t-tag v-if="row.status === CONTRACT_STATUS.EXECUTING" theme="success" variant="light">
-            {{ t('pages.listBase.contractStatusEnum.executing') }}
-          </t-tag>
-          <t-tag v-if="row.status === CONTRACT_STATUS.FINISH" theme="success" variant="light">
-            {{ t('pages.listBase.contractStatusEnum.finish') }}
-          </t-tag>
-        </template>
-        <template #contractType="{ row }">
-          <p v-if="row.contractType === CONTRACT_TYPES.MAIN">{{ t('pages.listBase.contractStatusEnum.fail') }}</p>
-          <p v-if="row.contractType === CONTRACT_TYPES.SUB">{{ t('pages.listBase.contractStatusEnum.audit') }}</p>
-          <p v-if="row.contractType === CONTRACT_TYPES.SUPPLEMENT">
-            {{ t('pages.listBase.contractStatusEnum.pending') }}
-          </p>
-        </template>
-        <template #paymentType="{ row }">
-          <div v-if="row.paymentType === CONTRACT_PAYMENT_TYPES.PAYMENT" class="payment-col">
-            {{ t('pages.listBase.pay') }}<trend class="dashboard-item-trend" type="up" />
-          </div>
-          <div v-if="row.paymentType === CONTRACT_PAYMENT_TYPES.RECEIPT" class="payment-col">
-            {{ t('pages.listBase.receive') }}<trend class="dashboard-item-trend" type="down" />
-          </div>
-        </template>
-
-        <template #op="slotProps">
-          <t-space>
-            <t-link theme="primary" @click="handleClickDetail()"> {{ t('pages.listBase.detail') }}</t-link>
-            <t-link theme="danger" @click="handleClickDelete(slotProps)"> {{ t('pages.listBase.delete') }}</t-link>
-          </t-space>
-        </template>
-      </t-table>
-    </t-card>
-
-    <t-dialog
-      v-model:visible="confirmVisible"
-      header="确认删除当前所选合同？"
-      :body="confirmBody"
-      :on-cancel="onCancel"
-      @confirm="onConfirmDelete"
-    />
+        </t-form-item>
+        <t-form-item label="性别" name="sex">
+          <t-select placeholder="请选择性别" v-model="submitForm.sex">
+            <t-option label="男" :value="0" />
+            <t-option label="女" :value="1" />
+            <t-option label="未知" :value="2" />
+          </t-select>
+        </t-form-item>
+        <t-form-item label="昵称" name="nickname">
+          <t-input v-model="submitForm.nickname" placeholder="请输入昵称" />
+        </t-form-item>
+        <t-form-item label="电话" name="phone">
+          <t-input-number theme="normal" v-model="submitForm.phone" placeholder="请输入电话" style="width: 100%" />
+        </t-form-item>
+        <t-form-item label="邮件" name="email">
+          <t-input v-model="submitForm.email" placeholder="请输入邮件" />
+        </t-form-item>
+        <t-form-item label="头像" name="avatar">
+        </t-form-item>
+      </t-form>
+    </t-dialog>
   </div>
 </template>
 
-<script lang="ts">
-export default {
-  name: 'ListBase',
-};
-</script>
 
 <script setup lang="ts">
-import { SearchIcon } from 'tdesign-icons-vue-next';
-import { MessagePlugin, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
-import { computed, onMounted, ref } from 'vue';
-import { useRouter } from 'vue-router';
+import STable from '@/components/s-table/index.vue';
+import { page, update, insert as insertApi, deleteById } from '@/api/sysUser';
+import { COLUMNS, searchParams, FORM_RULES } from '@/pages/list/base/props/index';
+import { ref } from 'vue';
+import { t } from '@/locales'
+import { DialogPlugin, FormInstanceFunctions, Link, MessagePlugin, Space } from 'tdesign-vue-next';
 
-import { getList } from '@/api/list';
-import Trend from '@/components/trend/index.vue';
-import { prefix } from '@/config/global';
-import { CONTRACT_PAYMENT_TYPES, CONTRACT_STATUS, CONTRACT_TYPES } from '@/constants';
-import { t } from '@/locales';
-import { useSettingStore } from '@/store';
+const modelOpen = ref(false);
+const submitFormRef = ref<FormInstanceFunctions>(null);
+const submitForm = ref({});
 
-const store = useSettingStore();
+const table = ref<TableInstanceFunctions>(null);
 
-const COLUMNS: PrimaryTableCol<TableRowData>[] = [
-  { colKey: 'row-select', type: 'multiple', width: 64, fixed: 'left' },
+const columns = COLUMNS.concat([
   {
-    title: t('pages.listBase.contractName'),
-    align: 'left',
-    width: 320,
-    colKey: 'name',
-    fixed: 'left',
-  },
-  { title: t('pages.listBase.contractStatus'), colKey: 'status', width: 160 },
-  {
-    title: t('pages.listBase.contractNum'),
-    width: 160,
-    ellipsis: true,
-    colKey: 'no',
-  },
-  {
-    title: t('pages.listBase.contractType'),
-    width: 160,
-    ellipsis: true,
-    colKey: 'contractType',
-  },
-  {
-    title: t('pages.listBase.contractPayType'),
-    width: 160,
-    ellipsis: true,
-    colKey: 'paymentType',
-  },
-  {
-    title: t('pages.listBase.contractAmount'),
-    width: 160,
-    ellipsis: true,
-    colKey: 'amount',
-  },
-  {
-    title: t('pages.listBase.operation'),
-    align: 'left',
+    align: 'center',
     fixed: 'right',
-    width: 160,
     colKey: 'op',
+    title: t('components.commonTable.operation'),
+    cell: (h, { row }) => h(Space, {}, [
+      h(Link, {
+        theme: 'primary',
+        onClick: () => {
+          // 表单赋值
+          submitForm.value = row;
+          // 打开dialog
+          modelOpen.value = true;
+          console.log('点击了修改', row)
+        }
+      }, '修改'),
+      h(Link, {
+        theme: 'danger',
+        onClick: () => {
+          const confirmDialog = DialogPlugin.confirm({
+            header: '提示',
+            body: `删除后，标记为${row.username}的用户信息将被清空，且无法恢复`,
+            confirmBtn: {
+              content: '提交',
+              theme: 'primary',
+              loading: false,
+            },
+            theme: 'warning',
+            onConfirm: async () => {
+              confirmDialog.update({ confirmBtn: { content: '提交', loading: true }});
+              await deleteById(row.id);
+              confirmDialog.update({ confirmBtn: { content: '提交中', loading: false }});
+              MessagePlugin.success('操作成功');
+              confirmDialog.hide();
+              table.value.onSearch();
+            },
+          })
+        }
+      }, '删除'),
+    ]),
   },
-];
+]);
 
-const data = ref([]);
-const pagination = ref({
-  defaultPageSize: 20,
-  total: 100,
-  defaultCurrent: 1,
-});
 
-const searchValue = ref('');
-
-const dataLoading = ref(false);
-const fetchData = async () => {
-  dataLoading.value = true;
-  try {
-    const { list } = await getList();
-    data.value = list;
-    pagination.value = {
-      ...pagination.value,
-      total: list.length,
-    };
-  } catch (e) {
-    console.log(e);
-  } finally {
-    dataLoading.value = false;
+//新增用户
+const insert = () => {
+  //打开dialog
+  modelOpen.value = true;
+  //重置表单
+  submitForm.value = {
+    sex: 2,
   }
-};
+}
 
-const deleteIdx = ref(-1);
-const confirmBody = computed(() => {
-  if (deleteIdx.value > -1) {
-    const { name } = data.value[deleteIdx.value];
-    return `删除后，${name}的所有合同信息将被清空，且无法恢复`;
+/**
+ * 提交表单
+ * @param  
+ */
+const onModelSubmit = async () => {
+  const valid = await submitFormRef.value.validate();
+  if (valid) {
+    if (submitForm.value.id) {
+      //更新
+      await update(submitForm.value);
+    } else {
+      //新增
+      await insertApi(submitForm.value);
+    }
+    MessagePlugin.success('操作成功');
+    modelOpen.value = false;
+    //刷新数据
+    table.value.onSearch();
   }
-  return '';
-});
-
-onMounted(() => {
-  fetchData();
-});
-
-const confirmVisible = ref(false);
-
-const selectedRowKeys = ref([1, 2]);
-
-const router = useRouter();
-
-const resetIdx = () => {
-  deleteIdx.value = -1;
-};
-
-const onConfirmDelete = () => {
-  // 真实业务请发起请求
-  data.value.splice(deleteIdx.value, 1);
-  pagination.value.total = data.value.length;
-  const selectedIdx = selectedRowKeys.value.indexOf(deleteIdx.value);
-  if (selectedIdx > -1) {
-    selectedRowKeys.value.splice(selectedIdx, 1);
-  }
-  confirmVisible.value = false;
-  MessagePlugin.success('删除成功');
-  resetIdx();
-};
-
-const onCancel = () => {
-  resetIdx();
-};
-
-const rowKey = 'index';
-
-const rehandleSelectChange = (val: number[]) => {
-  selectedRowKeys.value = val;
-};
-const rehandlePageChange = (curr: unknown, pageInfo: unknown) => {
-  console.log('分页变化', curr, pageInfo);
-};
-const rehandleChange = (changeParams: unknown, triggerAndData: unknown) => {
-  console.log('统一Change', changeParams, triggerAndData);
-};
-const handleClickDetail = () => {
-  router.push('/detail/base');
-};
-const handleSetupContract = () => {
-  router.push('/form/base');
-};
-const handleClickDelete = (row: { rowIndex: any }) => {
-  deleteIdx.value = row.rowIndex;
-  confirmVisible.value = true;
-};
-
-const headerAffixedTop = computed(
-  () =>
-    ({
-      offsetTop: store.isUseTabsRouter ? 48 : 0,
-      container: `.${prefix}-layout`,
-    }) as any,
-);
+}
 </script>
 
-<style lang="less" scoped>
-.payment-col {
-  display: flex;
-
-  .trend-container {
-    display: flex;
-    align-items: center;
-    margin-left: var(--td-comp-margin-s);
-  }
-}
-
-.list-card-container {
-  padding: var(--td-comp-paddingTB-xxl) var(--td-comp-paddingLR-xxl);
-
-  :deep(.t-card__body) {
-    padding: 0;
-  }
-}
-
-.left-operation-container {
-  display: flex;
-  align-items: center;
-  margin-bottom: var(--td-comp-margin-xxl);
-
-  .selected-count {
-    display: inline-block;
-    margin-left: var(--td-comp-margin-l);
-    color: var(--td-text-color-secondary);
-  }
-}
-
-.search-input {
-  width: 360px;
-}
-</style>
+<style lang="less" scoped></style>

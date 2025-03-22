@@ -22,10 +22,16 @@ export const useUserStore = defineStore('user', {
   },
   actions: {
     async login(userInfo: Record<string, unknown>) {
-      const { token, tokenHead } = await loginPwd(userInfo);
+      const { token, tokenHead, expireTime } = await loginPwd(userInfo);
       console.log(token, tokenHead);
       this.token = token;
       this.tokenHead = tokenHead;
+      if (expireTime) {
+        setTimeout(() => {
+          this.token = ''; // 清空token
+          alert('登录过期, 请重新登录');
+        }, expireTime * 1000);
+      }
       // const mockLogin = async (userInfo: Record<string, unknown>) => {
       //   // 登录请求流程
       //   console.log(`用户信息:`, userInfo);
